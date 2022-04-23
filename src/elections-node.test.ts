@@ -1,11 +1,13 @@
-// import { Field, isReady, shutdown, Mina, Party, UInt64, PrivateKey } from 'snarkyjs';
-// import { Add } from './index'
+import { Field, isReady, shutdown, Mina, Party, UInt64, PrivateKey } from 'snarkyjs';
 
 describe('aa', () => {
   it('aa', () => {
     expect(1).toBe(1)
   })
 })
+
+export {} 
+
 // const Local = Mina.LocalBlockchain();
 // Mina.setActiveInstance(Local);
 // const account1 = Local.testAccounts[0].privateKey;

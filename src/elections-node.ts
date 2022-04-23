@@ -1,8 +1,10 @@
-import {  Mina, Party, UInt64, PrivateKey, Bool, PublicKey, } from 'snarkyjs';
+import {  Mina, Party, UInt64, PrivateKey, Bool, PublicKey, Field } from 'snarkyjs';
 import { Voting } from './voting-snapp'
+import { MerkleTree } from './merkle-tree'
 
 type Transaction = ReturnType<typeof Mina.transaction>;
 type MinaInstance = ReturnType<typeof Mina.LocalBlockchain>;
+type VotingCard = Field;
 
 /**
  * Wraps zkapp contract running on a local simulator.
@@ -11,6 +13,7 @@ type MinaInstance = ReturnType<typeof Mina.LocalBlockchain>;
 
   public instance : MinaInstance;
   public snappAddress? : PublicKey;
+  public whitelistedVotingCards: VotingCard[]
 
   constructor() {
     const Local = Mina.LocalBlockchain();
@@ -24,6 +27,14 @@ type MinaInstance = ReturnType<typeof Mina.LocalBlockchain>;
 
   addTransaction(tx: Transaction){
     tx.send();
+  }
+
+  whitelistVotingCard(votingCard: VotingCard){
+    this.whitelistedVotingCards.push(votingCard)
+  }
+
+  __buildVotingCardTree(): MerkleTree{
+    return new MerkleTree(this.whitelistedVotingCards);
   }
 
   async getState() {

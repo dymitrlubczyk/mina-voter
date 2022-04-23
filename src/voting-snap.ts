@@ -10,15 +10,10 @@ import {
   Poseidon,
   arrayProp,
   CircuitValue,
+  isReady,
 } from 'snarkyjs';
 
-/**
- * Basic Example
- * See https://docs.minaprotocol.com/zkapps for more info.
- *
- * The Add contract initializes the state variable 'num' to be a Field(1) value by default when deployed.
- * When the 'update' method is called, the Add contract adds Field(2) to its 'num' contract state.
- */
+await isReady;
 
 class MerklePath extends CircuitValue {
   @arrayProp(Field, 8) path: Field[];
