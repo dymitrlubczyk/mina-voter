@@ -21,8 +21,8 @@ import {
  */
 
 class MerklePath extends CircuitValue {
-  @arrayProp(Field, 32) path: Field[];
-  @arrayProp(Bool, 32) isLeft: Bool[];
+  @arrayProp(Field, 8) path: Field[];
+  @arrayProp(Bool, 8) isLeft: Bool[];
 
   constructor(path: number[], isLeafOnTheLeft: boolean[]) {
     super();
@@ -33,7 +33,7 @@ class MerklePath extends CircuitValue {
   calculateRoot(leaf: Field) {
     let hash = leaf;
 
-    for (let i = 0; i < 32; ++i) {
+    for (let i = 0; i < 8; ++i) {
       const left = Circuit.if(this.isLeft[i], hash, this.path[i]);
       const right = Circuit.if(this.isLeft[i], this.path[i], hash);
       hash = Poseidon.hash([left, right]);
@@ -51,13 +51,18 @@ export class Voting extends SmartContract {
   @state(Field) lastNullifier = State<Field>();
 
   // initialization
-  deploy(args: any) {
+  deploy(args: any) {    
     super.deploy(args);
 
     this.self.update.permissions.setValue({
-      ...Permissions.default(),
-      editState: Permissions.proofOrSignature(),
-    });
+      ...Permissions.default()    });
+
+    const {nullifierRoot, votingCardRoot} = args;
+
+    this.for.set(Field(0));
+    this.against.set(Field(0));
+    this.nullifierRoot.set(nullifierRoot);
+    this.votingCardRoot.set(votingCardRoot);
   }
 
   @method vote(
@@ -70,8 +75,8 @@ export class Voting extends SmartContract {
     // votingCard = hash(nullifier, secret)
     const votingCard = Poseidon.hash([nullifier, secret]);
 
-    let unusedNullifier = Poseidon.hash([Field(0), nullifier]);
-    let usedNullifier = Poseidon.hash([Field(1), nullifier]);
+    const unusedNullifier = Poseidon.hash([Field(0), nullifier]);
+    const usedNullifier = Poseidon.hash([Field(1), nullifier]);
 
     // verify votingCardPath
 

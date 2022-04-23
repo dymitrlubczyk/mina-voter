@@ -1,11 +1,11 @@
-import { isReady, shutdown, Mina, Party, UInt64, PrivateKey, compile, Bool, PublicKey } from 'snarkyjs';
+import {  Mina, Party, UInt64, PrivateKey, Bool, PublicKey } from 'snarkyjs';
 import { Voting } from './voting-snapp'
 
 
 /**
  * Wraps zkapp contract running on a local simulator.
  */
-class VotingSimulator {
+export class VotingSimulator {
   private _deployer: PrivateKey;
   private _voter: PrivateKey;
   private _snappAddress: PublicKey;
@@ -23,7 +23,7 @@ class VotingSimulator {
 
   async deploy() {
     let tx = Mina.transaction(this._deployer, () => {
-      const initialBalance = UInt64.fromNumber(1000000);
+      
       const p = Party.createSigned(this._voter);
       p.balance.subInPlace(initialBalance);
       const snapp = new Voting(this._snappAddress);
@@ -59,17 +59,3 @@ class VotingSimulator {
     };
   }
 }
-
-
-(async () => {
-  await isReady;
-  
-  const snapp = new VotingSimulator();
-  await snapp.deploy();
-  console.log(await snapp.getState())
-  await snapp.vote(true);
-  await snapp.vote(true);
-  console.log(await snapp.getState())
-
-  await shutdown();
-})()

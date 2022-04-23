@@ -1,3 +1,5 @@
+# TODO
+
 # Mina zkApp: Minsweeper
 
 This template uses TypeScript.
