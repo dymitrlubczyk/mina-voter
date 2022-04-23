@@ -1,12 +1,8 @@
-import { isReady, shutdown } from 'snarkyjs';
-import {
-  Mina,
-  Field,
-  Poseidon,
-} from 'snarkyjs';
+import expect from 'expect';
+
+import { isReady, shutdown, Mina,Field, Poseidon, } from 'snarkyjs';
 import { ElectionsFactory } from './elections-factory';
 import { ElectionsNode } from './elections-node';
-import expect from 'expect';
 
 describe('Elections node', async () => {
   const nonces = [
@@ -103,5 +99,35 @@ describe('Elections node', async () => {
   });
 
 
-  it.skip('no double voting');
+  it('no double voting', async () => {
+    await electionsNode.vote(
+      true,
+      testAccounts[0].privateKey,
+      nonces[0].secret,
+      nonces[0].nullifier,
+      electionsFactory.votingCardWitnesses[0]
+    );
+
+    await expect(electionsNode.vote(
+      true,
+      testAccounts[0].privateKey,
+      nonces[0].secret,
+      nonces[0].nullifier,
+      electionsFactory.votingCardWitnesses[0]
+    )).toThrow;
+
+    const { forCounter, againstCounter } = await electionsNode.getState();
+    expect(forCounter.toString()).toBe('1');
+    expect(againstCounter.toString()).toBe('0');
+  });
+
+  it('cannot vote with wrong secret', async () => {
+    await expect(electionsNode.vote(
+      true,
+      testAccounts[0].privateKey,
+      nonces[1].secret,
+      nonces[0].nullifier,
+      electionsFactory.votingCardWitnesses[0]
+    )).toThrow;
+  })
 });

@@ -1,28 +1,25 @@
-# TODO
+# Anonymous & Fair voting system on Mina network
 
-# Mina zkApp: Minsweeper
-
-This template uses TypeScript.
-
-## How to build
-
-```sh
-npm run build
+## Quick start
 ```
-
-## How to run tests
-
-```sh
-npm run test
-npm run testw # watch mode
+yarn install
+yarn test
 ```
+## Voting process
+1. Voters: each voter generates `votingCard` and correlated `nullifier`
+2. Voters: each voter submits `votingCard` to 
 
-## How to run coverage
+## Features
+- 
 
-```sh
-npm run coverage
-```
+## Threat model
 
-## License
+## How it works
 
-[Apache-2.0](LICENSE)
+## Project structure
+
+## Usage of MINA network
+
+---
+
+Done at ETH Amsterdam Hackathon

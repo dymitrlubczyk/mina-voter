@@ -10,7 +10,7 @@ export type Witness = {
  */
 export class MerkleTree {
   private nodes: Record<number, Record<string, Field>> = {};
-  private zeroes: Field[]; // zeroes[i] = hash(zeroes[i+1], zeroes[i+1])
+  private zeroes: Field[];
 
   constructor(public readonly height: number) {
     this.zeroes = [Field(0)];

@@ -1,5 +1,5 @@
 import { Mina, PrivateKey, Bool, PublicKey, Field } from 'snarkyjs';
-import { Voting, MerkleWitness } from './voting-snap';
+import { Voting, MerkleWitness } from './voting-snapp';
 import { MerkleTree, Witness } from './merkle-tree';
 
 /**
