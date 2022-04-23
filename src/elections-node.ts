@@ -1,36 +1,45 @@
-import {  Mina, Party, UInt64, PrivateKey, Bool, PublicKey, Field } from 'snarkyjs';
-import { Voting } from './voting-snapp'
-import { MerkleTree } from './merkle-tree'
-import { getNullifierData } from './merkle-tree'
-
-type Transaction = ReturnType<typeof Mina.transaction>;
-type MinaInstance = ReturnType<typeof Mina.LocalBlockchain>;
-type VotingCard = Field;
+import { Mina, PrivateKey, Bool, PublicKey, Field } from 'snarkyjs';
+import { Voting, MerkleWitness } from './voting-snap';
+import { MerkleTree, Witness } from './merkle-tree';
 
 /**
  * Wraps zkapp contract running on a local simulator.
  */
- export class ElectionsNode {
+export class ElectionsNode {
+  public nullifierTree = new MerkleTree(256);
 
-  public snappAddress : PublicKey;
-  public nullifierTree: MerkleTree;
-
-  constructor(snappAddress : PublicKey) {
-    this.snappAddress = snappAddress;
-    this.nullifierTree = new MerkleTree(256);
-    this.verifyNullifierIntegrity()
+  constructor(
+    private snappAddress: PublicKey,
+    private snappPrivateKey: PrivateKey
+  ) {
+    this.verifyNullifierIntegrity();
   }
 
   async getState() {
     const state = (await Mina.getAccount(this.snappAddress!)).zkapp.appState;
-    const [forCounter, againstCounter, nullifierRoot, votingCardRoot, lastNullifier] = state;
+    const [
+      forCounter,
+      againstCounter,
+      nullifierRoot,
+      votingCardRoot,
+      lastNullifier,
+    ] = state;
 
-    return {forCounter, againstCounter, nullifierRoot, votingCardRoot, lastNullifier};
+    return {
+      forCounter,
+      againstCounter,
+      nullifierRoot,
+      votingCardRoot,
+      lastNullifier,
+    };
   }
 
-  async verifyNullifierIntegrity(){
+  async verifyNullifierIntegrity() {
     const { nullifierRoot } = await this.getState();
-    console.assert(this.nullifierTree.getRoot() == nullifierRoot, "Nullifier tree unsynced");
+    console.assert(
+      this.nullifierTree.getRoot().equals(nullifierRoot).toBoolean(),
+      'Nullifier tree unsynced'
+    );
   }
 
   async refreshNullifierTree() {
@@ -39,4 +48,31 @@ type VotingCard = Field;
     await this.verifyNullifierIntegrity();
   }
 
+  async vote(
+    vote: boolean,
+    voterPrivateKey: PrivateKey,
+    secret: Field,
+    nullifier: Field,
+    votingCardWitness: Witness
+  ) {
+    let tx = Mina.transaction(voterPrivateKey, () => {
+      const snapp = new Voting(this.snappAddress);
+      const nullifierWitness = this.nullifierTree.getWitness(
+        BigInt(nullifier.toString())
+      );
+
+      snapp.vote(
+        Bool(vote),
+        nullifier,
+        secret,
+        new MerkleWitness(nullifierWitness),
+        new MerkleWitness(votingCardWitness)
+      );
+      snapp.self.sign(this.snappPrivateKey);
+      snapp.self.body.incrementNonce = new Bool(true);
+    });
+
+    await tx.send().wait();
+    await this.refreshNullifierTree();
+  }
 }

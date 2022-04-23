@@ -1,3 +1,4 @@
+//import assert from 'assert';
 import {
   Field,
   SmartContract,
@@ -12,31 +13,43 @@ import {
   CircuitValue,
   isReady,
 } from 'snarkyjs';
-
-import { getNullifierData } from './voting-utils';
+import { Witness } from './merkle-tree';
 
 await isReady;
 
-class MerklePath extends CircuitValue {
-  @arrayProp(Field, 8) path: Field[];
-  @arrayProp(Bool, 8) isLeft: Bool[];
+export class MerkleWitness extends CircuitValue {
+  @arrayProp(Field, 255) path: Field[];
+  @arrayProp(Bool, 255) isLeft: Bool[];
 
-  constructor(path: number[], isLeafOnTheLeft: boolean[]) {
+  constructor(witness: Witness) {
     super();
-    this.path = path.map(Field);
-    this.isLeft = isLeafOnTheLeft.map(Bool);
+
+    this.path = witness.map(x => x.sibling);
+    this.isLeft = witness.map(x => Bool(x.isLeft));
   }
 
-  calculateRoot(leaf: Field) {
+  calculateRoot(leaf: Field) : Field {
     let hash = leaf;
 
-    for (let i = 0; i < 8; ++i) {
-      const left = Circuit.if(this.isLeft[i], hash, this.path[i]);
-      const right = Circuit.if(this.isLeft[i], this.path[i], hash);
+    for (let i = 1; i < 256; ++i) {
+      const left = Circuit.if(this.isLeft[i - 1], hash, this.path[i - 1]);
+      const right = Circuit.if(this.isLeft[i - 1], this.path[i - 1], hash);
       hash = Poseidon.hash([left, right]);
     }
 
-    return hash;
+    return hash
+  }
+
+  calculateIndex(): Field {
+    let powerOfTwo = Field(1);
+    let index = Field(0);
+
+    for (let i = 1; i < 256; ++i) {
+      index = Circuit.if(this.isLeft[i - 1], index, index.add(powerOfTwo))
+      powerOfTwo = powerOfTwo.mul(2);
+    }
+
+    return index;
   }
 }
 
@@ -48,11 +61,11 @@ export class Voting extends SmartContract {
   @state(Field) lastNullifier = State<Field>();
 
   // initialization
-  deploy(args: any) {    
+  deploy(args: any) {
     super.deploy(args);
 
     this.self.update.permissions.setValue({
-      ...Permissions.default()    });
+      ...Permissions.default(), editState: Permissions.signature()});
 
     const {nullifierRoot, votingCardRoot} = args;
 
@@ -66,22 +79,29 @@ export class Voting extends SmartContract {
     vote: Bool,
     nullifier: Field,
     secret: Field,
-    nullifierPath: MerklePath,
-    votingCardPath: MerklePath
+    nullifierWitness: MerkleWitness,
+    votingCardWitness: MerkleWitness
   ) {
     // votingCard = hash(nullifier, secret)
     const votingCard = Poseidon.hash([nullifier, secret]);
 
     // verify votingCardPath
-    this.votingCardRoot.assertEquals(votingCardPath.calculateRoot(votingCard));
+    this.votingCardRoot.assertEquals(votingCardWitness.calculateRoot(votingCard));
+
+    // traverse nullifierPath
+
+    const nullifierRootFromPath = nullifierWitness.calculateRoot(Field(0));
+    const nullifierFromPath = nullifierWitness.calculateIndex();
 
     // verify nullifierPath
 
-    this.nullifierRoot.assertEquals(nullifierPath.calculateRoot(Field(0)));
+    this.nullifierRoot.assertEquals(nullifierRootFromPath);
+    nullifier.assertEquals(nullifierFromPath)
 
     // nullify, i.e. calculate new nullifier tree
 
-    this.nullifierRoot.set(nullifierPath.calculateRoot(Field(1)));
+    const nullifierRootNew = nullifierWitness.calculateRoot(Field(1));
+    this.nullifierRoot.set(nullifierRootNew);
 
     // publish nullifier so that others can update merklePath
 

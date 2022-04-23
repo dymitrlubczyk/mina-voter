@@ -1,42 +1,40 @@
 import {  Mina, Party, UInt64, PrivateKey, Bool, PublicKey, Field } from 'snarkyjs';
 import { Voting } from './voting-snap'
-import { MerkleTree } from './merkle-tree'
-import { getNullifierData } from './merkle-tree'
+import { MerkleTree, Witness } from './merkle-tree'
 
 type Transaction = ReturnType<typeof Mina.transaction>;
-type MinaInstance = ReturnType<typeof Mina.LocalBlockchain>;
-type VotingCard = Field;
 
 /**
  * Wraps zkapp contract running on a local simulator.
  */
  export class ElectionsFactory {
 
-  public whitelistedVotingCards: VotingCard[] = []
+  public votingCardWitnesses: Witness[] = []
 
-  addTransaction(tx: Transaction){
+  public votingCardTree = new MerkleTree(256);
+
+  constructor(public whitelistedVotingCards: Field[]) {
+    for(let i = 0; i < whitelistedVotingCards.length; i++) {
+      this.votingCardTree.setLeaf(BigInt(i), this.whitelistedVotingCards[i])
+    }
+
+    for(let i = 0; i < whitelistedVotingCards.length; i++) {
+      this.votingCardWitnesses.push(this.votingCardTree.getWitness(BigInt(i)))
+    }
+  }
+
+  addTransaction(tx: Transaction) {
     tx.send();
   }
 
-  whitelistVotingCard(votingCard: VotingCard){
-    this.whitelistedVotingCards.push(votingCard)
-  }
-
-  __buildVotingCardTree(): MerkleTree{
-    const result = new MerkleTree(256);
-    result.fill(this.whitelistedVotingCards);
-    return result;
-  }
-
-  generateTransaction(deployerSecretKey: PrivateKey, args: any) : {deployTransaction: Transaction, snappAddress: PublicKey} {
+  generateTransaction(deployerSecretKey: PrivateKey, args: any) : {deployTransaction: Transaction, snappPrivateKey:PrivateKey, snappAddress: PublicKey, votingCardTree: MerkleTree} {
     const snappPrivateKey = PrivateKey.random();
     const snappAddress = snappPrivateKey.toPublicKey();
     const initialBalance = UInt64.fromNumber(1000000);
 
-    const votingCardTree = this.__buildVotingCardTree()
-    const votingCardRoot = votingCardTree.getRoot()
+    const votingCardRoot = this.votingCardTree.getRoot()
 
-    const nullifierRoot = new MerkleTree(256);
+    const nullifierRoot = new MerkleTree(256).getRoot();
 
     let deployTransaction = Mina.transaction(deployerSecretKey, () => {
       const snapp = new Voting(snappAddress);
@@ -45,8 +43,8 @@ type VotingCard = Field;
       snapp.deploy({ zkappKey: snappPrivateKey, votingCardRoot, nullifierRoot, ...args });
       snapp.balance.addInPlace(initialBalance);
     });
-  
-    return {deployTransaction, snappAddress};
+
+    return {deployTransaction, snappPrivateKey, snappAddress, votingCardTree: this.votingCardTree};
   }
 
 
