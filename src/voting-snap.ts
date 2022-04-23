@@ -13,6 +13,8 @@ import {
   isReady,
 } from 'snarkyjs';
 
+import { getNullifierData } from './voting-utils';
+
 await isReady;
 
 class MerklePath extends CircuitValue {
@@ -70,20 +72,16 @@ export class Voting extends SmartContract {
     // votingCard = hash(nullifier, secret)
     const votingCard = Poseidon.hash([nullifier, secret]);
 
-    const unusedNullifier = Poseidon.hash([Field(0), nullifier]);
-    const usedNullifier = Poseidon.hash([Field(1), nullifier]);
-
     // verify votingCardPath
-
     this.votingCardRoot.assertEquals(votingCardPath.calculateRoot(votingCard));
 
     // verify nullifierPath
 
-    this.nullifierRoot.assertEquals(nullifierPath.calculateRoot(unusedNullifier));
+    this.nullifierRoot.assertEquals(nullifierPath.calculateRoot(Field(0)));
 
     // nullify, i.e. calculate new nullifier tree
 
-    this.nullifierRoot.set(nullifierPath.calculateRoot(usedNullifier));
+    this.nullifierRoot.set(nullifierPath.calculateRoot(Field(1)));
 
     // publish nullifier so that others can update merklePath
 

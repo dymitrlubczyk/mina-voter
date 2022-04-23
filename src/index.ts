@@ -4,20 +4,27 @@ import { Mina, Party, UInt64, PrivateKey, Bool, PublicKey,Field } from 'snarkyjs
 
 (async () => {
   await isReady;
+  console.log("SnarkyJS ready")
+
+  const Local = Mina.LocalBlockchain();
+  Mina.setActiveInstance(Local);
+  const testAccounts = Local.testAccounts;
+
   console.log("Mina ready")
 
+  const { ElectionsFactory } = await import('./elections-factory');
+
+  const electionsFactory= new ElectionsFactory();
+  electionsFactory.whitelistVotingCard(Field(2137));
+  const {deployTransaction, snappAddress } = electionsFactory.generateTransaction(testAccounts[0].privateKey, {});
+
+  console.log("Factory ready")
+
+  deployTransaction.send()
   const { ElectionsNode } = await import('./elections-node');
+  const electionsNode = new ElectionsNode(snappAddress)
 
-  const electionsNode = new ElectionsNode();
-  const testAccounts = electionsNode.getTestAccounts();
   console.log("Node ready")
- 
-  const nullifierRoot = Field(2137);
-  const votingCardRoot = Field(420);
-
-  const {deployTransaction, snappAddress } = electionsNode.createDeployTransaction(testAccounts[0].privateKey, {nullifierRoot, votingCardRoot});
-  electionsNode.addTransaction(deployTransaction);
-  electionsNode.setAddress(snappAddress);
 
   //@ts-ignore
   console.log(deployTransaction.toJSON());
