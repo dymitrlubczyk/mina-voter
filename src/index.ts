@@ -1,4 +1,4 @@
-import { Field, SmartContract, state, State, method, UInt64 } from 'snarkyjs';
+import { Field, SmartContract, state, State, method, UInt64, Permissions, Bool, Circuit } from 'snarkyjs';
 
 /**
  * Basic Example
@@ -7,20 +7,27 @@ import { Field, SmartContract, state, State, method, UInt64 } from 'snarkyjs';
  * The Add contract initializes the state variable 'num' to be a Field(1) value by default when deployed.
  * When the 'update' method is called, the Add contract adds Field(2) to its 'num' contract state.
  */
-export default class Add extends SmartContract {
-  @state(Field) num = State<Field>();
+export class Voting extends SmartContract {
+  @state(Field) for = State<Field>();
+  @state(Field) against = State<Field>();
 
   // initialization
-  deploy(initialBalance: UInt64, num: Field = Field(1)) {
-    super.deploy();
-    this.balance.addInPlace(initialBalance);
-    this.num.set(num);
+  deploy(args: any) {
+    super.deploy(args);
+
+    this.self.update.permissions.setValue({
+      ...Permissions.default(),
+      editState: Permissions.proofOrSignature()
+    })
   }
 
-  @method async update() {
-    const currentState = await this.num.get();
-    const newState = currentState.add(2);
-    newState.assertEquals(currentState.add(2));
-    this.num.set(newState);
+  @method vote(forState: Field, againstState: Field, vote: Bool) {
+    // Workaround while state reading does not work.
+    this.for.set(forState);
+    this.against.set(againstState);
+
+    // Update counters
+    this.for.set(Circuit.if(vote, forState.add(1), forState));
+    this.against.set(Circuit.if(vote, againstState, againstState.add(1)));
   }
 }
