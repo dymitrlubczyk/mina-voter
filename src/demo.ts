@@ -1,5 +1,5 @@
-import { Field, isReady, shutdown, Mina, Party, UInt64, PrivateKey, compile, Bool, PublicKey } from 'snarkyjs';
-import { Voting } from './index'
+import { isReady, shutdown, Mina, Party, UInt64, PrivateKey, compile, Bool, PublicKey } from 'snarkyjs';
+import { Voting } from './voting-snapp'
 
 
 /**
@@ -34,10 +34,9 @@ class VotingSimulator {
   }
 
   async vote(vote: boolean) {
-    const { forCounter, againstCounter } = await this.getFieldState();
     let tx = Mina.transaction(this._voter, () => {
       const snapp = new Voting(this._snappAddress);
-      snapp.vote(forCounter, againstCounter, new Bool(vote));
+      snapp.vote(new Bool(vote));
       snapp.self.sign(this._snappPrivateKey);
       snapp.self.body.incrementNonce = new Bool(true);
     });
@@ -68,6 +67,7 @@ class VotingSimulator {
   const snapp = new VotingSimulator();
   await snapp.deploy();
   console.log(await snapp.getState())
+  await snapp.vote(true);
   await snapp.vote(true);
   console.log(await snapp.getState())
 

@@ -1,33 +1,75 @@
-import { Field, SmartContract, state, State, method, UInt64, Permissions, Bool, Circuit } from 'snarkyjs';
+import { isReady, shutdown, Mina, Party, UInt64, PrivateKey, compile, Bool, PublicKey } from 'snarkyjs';
+import { Voting } from './voting-snapp.ts'
+
 
 /**
- * Basic Example
- * See https://docs.minaprotocol.com/zkapps for more info.
- *
- * The Add contract initializes the state variable 'num' to be a Field(1) value by default when deployed.
- * When the 'update' method is called, the Add contract adds Field(2) to its 'num' contract state.
+ * Wraps zkapp contract running on a local simulator.
  */
-export class Voting extends SmartContract {
-  @state(Field) for = State<Field>();
-  @state(Field) against = State<Field>();
+class VotingSimulator {
+  private _deployer: PrivateKey;
+  private _voter: PrivateKey;
+  private _snappAddress: PublicKey;
+  private _snappPrivateKey: PrivateKey
 
-  // initialization
-  deploy(args: any) {
-    super.deploy(args);
-
-    this.self.update.permissions.setValue({
-      ...Permissions.default(),
-      editState: Permissions.proofOrSignature()
-    })
+  constructor() {
+    const Local = Mina.LocalBlockchain();
+    Mina.setActiveInstance(Local);
+    this._deployer = Local.testAccounts[0].privateKey;
+    this._voter = Local.testAccounts[1].privateKey;
+    
+    this._snappPrivateKey = PrivateKey.random();
+    this._snappAddress = this._snappPrivateKey.toPublicKey();
   }
 
-  @method vote(forState: Field, againstState: Field, vote: Bool) {
-    // Workaround while state reading does not work.
-    this.for.set(forState);
-    this.against.set(againstState);
+  async deploy() {
+    let tx = Mina.transaction(this._deployer, () => {
+      const initialBalance = UInt64.fromNumber(1000000);
+      const p = Party.createSigned(this._voter);
+      p.balance.subInPlace(initialBalance);
+      const snapp = new Voting(this._snappAddress);
+      snapp.deploy({ zkappKey: this._snappPrivateKey });
+      snapp.balance.addInPlace(initialBalance);
+    });
+    await tx.send().wait();
+  }
 
-    // Update counters
-    this.for.set(Circuit.if(vote, forState.add(1), forState));
-    this.against.set(Circuit.if(vote, againstState, againstState.add(1)));
+  async vote(vote: boolean) {
+    let tx = Mina.transaction(this._voter, () => {
+      const snapp = new Voting(this._snappAddress);
+      snapp.vote(new Bool(vote));
+      snapp.self.sign(this._snappPrivateKey);
+      snapp.self.body.incrementNonce = new Bool(true);
+    });
+    await tx.send().wait();
+  }
+
+  async getFieldState() {
+    let snappState = (await Mina.getAccount(this._snappAddress)).zkapp.appState;
+    return {
+      forCounter: snappState[0],
+      againstCounter: snappState[1]
+    };
+  }
+
+  async getState() {
+    const { forCounter, againstCounter } = await this.getFieldState();
+    return {
+      forCounter: parseInt(forCounter.toString()),
+      againstCounter: parseInt(againstCounter.toString())
+    };
   }
 }
+
+
+(async () => {
+  await isReady;
+  
+  const snapp = new VotingSimulator();
+  await snapp.deploy();
+  console.log(await snapp.getState())
+  await snapp.vote(true);
+  await snapp.vote(true);
+  console.log(await snapp.getState())
+
+  await shutdown();
+})()
